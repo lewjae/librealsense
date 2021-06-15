@@ -66,7 +66,6 @@ def calculate_cumulative_pointcloud(frames_devices, calibration_info_devices, ro
 
 
 
-
 def calculate_boundingbox_points(point_cloud, calibration_info_devices, depth_threshold = 0.01):
 	"""
 	Calculate the top and bottom bounding box corner points for the point cloud in the image coordinates of the color imager of the realsense device
