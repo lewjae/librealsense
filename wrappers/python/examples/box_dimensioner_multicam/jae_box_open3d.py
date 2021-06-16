@@ -13,6 +13,7 @@
 ###########################################################################################################################
 
 # Import RealSense, OpenCV and NumPy
+from os import close
 import pyrealsense2 as rs
 import cv2
 import numpy as np
@@ -21,7 +22,7 @@ import open3d as o3d
 
 # Import helper functions and classes written to wrap the RealSense, OpenCV and Kabsch Calibration usage
 from collections import defaultdict
-from realsense_device_manager import DeviceManager
+from realsense_device_manager import DeviceManager, post_process_depth_frame
 from calibration_kabsch import PoseEstimation
 from helper_functions import get_boundary_corners_2D
 from measurement_task import calculate_boundingbox_points, calculate_cumulative_pointcloud, visualise_measurements
@@ -29,8 +30,8 @@ from measurement_task import calculate_boundingbox_points, calculate_cumulative_
 def run_demo():
 	
 	# Define some constants 
-	resolution_width = 1280 # pixels
-	resolution_height = 720 # pixels
+	resolution_width = 640 # pixels
+	resolution_height = 480 # pixels
 	frame_rate = 30  # fps
 	dispose_frames_for_stablisation = 30  # frames
 	
@@ -121,7 +122,6 @@ def run_demo():
 
 
 
-
 		# Continue acquisition until terminated with Ctrl+C by the user
 		while 1:
 			 # Get the frames from all the devices
@@ -131,41 +131,47 @@ def run_demo():
 			#point_cloud = calculate_cumulative_pointcloud(frames_devices, calibration_info_devices, roi_2D)
 
 			# Use a threshold of 5 centimeters from the chessboard as the area where useful points are found
-			point_cloud_cumulative = np.array([-1, -1, -1]).transpose()
+			#point_cloud_cumulative = np.array([-1, -1, -1]).transpose()
+			pcds = list()
 			for (device, frame) in frames_devices.items() :
 				color_frame = frame[rs.stream.color]
 				# Filter the depth_frame using the Temporal filter and get the corresponding pointcloud for each frame
-				depth_frame = post_process_depth_frame(frame[rs.stream.depth], temporal_smooth_alpha=0.1, temporal_smooth_delta=80)	
-				
-				color_np = np.asanyarray(color_frame.getdata())
-				depth_np = np.asanyarray(depth_frame.getdata())
+				#depth_frame = post_process_depth_frame(frame[rs.stream.depth], temporal_smooth_alpha=0.1, temporal_smooth_delta=80)	
+				depth_frame = frame[rs.stream.depth]
+				color_np = np.asanyarray(color_frame.get_data())
+				depth_np = np.asanyarray(depth_frame.get_data())
 
 				# Convert numpy to open3D
 				rgb = o3d.geometry.Image(color_np)
 				depth = o3d.geometry.Image(depth_np)
 
 				# Create rgbd
-				rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb, depth)
+				rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb, depth, convert_rgb_to_intensity=False)
 				print("color :", calibration_info_devices[device][1][rs.stream.color])
+				
 				print("depth :",  calibration_info_devices[device][1][rs.stream.depth])
+				pose_mat = calibration_info_devices[device][0].pose_mat
+				print("pose_mat: ", device, pose_mat)
+
+				intrinsics = calibration_info_devices[device][1][rs.stream.depth]
+
+				w = intrinsics.width
+				h = intrinsics.height
+				fx = intrinsics.fx
+				fy = intrinsics.fy
+				ppx = intrinsics.ppx
+				ppy = intrinsics.ppy
 
 				pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd,o3d.camera.PinholeCameraIntrinsic(w,h,fx,fy,ppx,ppy))
+				pcd = pcd.transform(pose_mat)
+				pcds.append(pcd)
 
-
-				point_cloud = convert_depth_frame_to_pointcloud( np.asarray( filtered_depth_frame.get_data()), calibration_info_devices[device][1][rs.stream.depth])
-				point_cloud = np.asanyarray(point_cloud)
-
-				# Get the point cloud in the world-coordinates using the transformation
-				point_cloud = calibration_info_devices[device][0].apply_transformation(point_cloud)
-
-				# Filter the point cloud based on the depth of the object
-				# The object placed has its height in the negative direction of z-axis due to the right-hand coordinate system
-				point_cloud = get_clipped_pointcloud(point_cloud, roi_2d)
-				point_cloud = point_cloud[:,point_cloud[2,:]<-depth_threshold]
-				point_cloud_cumulative = np.column_stack( ( point_cloud_cumulative, point_cloud ) )
-			point_cloud_cumulative = np.delete(point_cloud_cumulative, 0, 1)
-
-
+			vis = o3d.visualization.Visualizer()
+			vis.create_window()
+			for i in range(len(device_manager._available_devices)):
+				vis.add_geometry(pcds[i])
+			o3d.visualization.ViewControl.set_zoom(vis.get_view_control(), 0.3)
+			vis.run()
 
 
 			# Get the bounding box for the pointcloud in image coordinates of the color imager
