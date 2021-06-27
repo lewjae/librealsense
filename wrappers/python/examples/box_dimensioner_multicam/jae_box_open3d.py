@@ -53,8 +53,12 @@ def run_demo():
 		# Allow some frames for the auto-exposure controller to stablise
 		for frame in range(dispose_frames_for_stablisation):
 			frames = device_manager.poll_frames()
-
 		assert( len(device_manager._available_devices) > 0 )
+
+		for device, frame in frames.items():
+			print("frame: ",device, rs.stream.color)
+			#align = rs.align(frame[rs.stream.color])
+
 		"""
 		1: Calibration
 		Calibrate all the available devices to the world co-ordinates.
@@ -94,7 +98,7 @@ def run_demo():
 		# It is necessary for this demo that the object's length and breath is smaller than that of the chessboard
 		chessboard_points_cumulative_3d = np.delete(chessboard_points_cumulative_3d, 0, 1)
 		roi_2D = get_boundary_corners_2D(chessboard_points_cumulative_3d)
-
+		print("roi_2D: ",roi_2D)
 		print("Calibration completed... \nPlace the box in the field of view of the devices...")
 
 
@@ -134,10 +138,13 @@ def run_demo():
 			#point_cloud_cumulative = np.array([-1, -1, -1]).transpose()
 			pcds = list()
 			for (device, frame) in frames_devices.items() :
+
 				color_frame = frame[rs.stream.color]
 				# Filter the depth_frame using the Temporal filter and get the corresponding pointcloud for each frame
 				#depth_frame = post_process_depth_frame(frame[rs.stream.depth], temporal_smooth_alpha=0.1, temporal_smooth_delta=80)	
 				depth_frame = frame[rs.stream.depth]
+				
+				#depth_frame = frame[rs.stream.depth]
 				color_np = np.asanyarray(color_frame.get_data())
 				depth_np = np.asanyarray(depth_frame.get_data())
 
