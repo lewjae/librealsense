@@ -136,14 +136,16 @@ def run_demo():
 
 			# Use a threshold of 5 centimeters from the chessboard as the area where useful points are found
 			#point_cloud_cumulative = np.array([-1, -1, -1]).transpose()
+
 			pcds = list()
+	
 			for (device, frame) in frames_devices.items() :
 
 				color_frame = frame[rs.stream.color]
 				# Filter the depth_frame using the Temporal filter and get the corresponding pointcloud for each frame
 				#depth_frame = post_process_depth_frame(frame[rs.stream.depth], temporal_smooth_alpha=0.1, temporal_smooth_delta=80)	
 				depth_frame = frame[rs.stream.depth]
-				
+					
 				#depth_frame = frame[rs.stream.depth]
 				color_np = np.asanyarray(color_frame.get_data())
 				depth_np = np.asanyarray(depth_frame.get_data())
@@ -155,7 +157,7 @@ def run_demo():
 				# Create rgbd
 				rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb, depth, convert_rgb_to_intensity=False)
 				print("color :", calibration_info_devices[device][1][rs.stream.color])
-				
+					
 				print("depth :",  calibration_info_devices[device][1][rs.stream.depth])
 				pose_mat = calibration_info_devices[device][0].pose_mat
 				print("pose_mat: ", device, pose_mat)
